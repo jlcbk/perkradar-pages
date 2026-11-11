@@ -5,8 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # 每 2 小时抓取并重新发布一次静态看板（UTC 时间）
-    - cron: '15 */2 * * *'
+    # 每小时抓取并重新发布一次静态看板（UTC 时间，避开整点/刻钟拥堵高峰）
+    - cron: '23 * * * *'
 
 permissions:
   contents: read

@@ -1,16 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getBoardState } from "../src/lib/board";
-import { REFRESH_INTERVAL_MS } from "../src/lib/config";
 import { getDb, setMeta, useDatabase as resetDatabase } from "../src/lib/db";
 import { runRefresh } from "../src/lib/refresh";
+
+const PAGES_SCHEDULE_INTERVAL_MS = 60 * 60_000;
 
 async function main(): Promise<void> {
   const skipLiveFetch = process.env.SKIP_LIVE_FETCH === "1";
 
   if (!skipLiveFetch) {
     await runRefresh({ trigger: "schedule" });
-    setMeta("next_refresh_at", String(Date.now() + REFRESH_INTERVAL_MS));
+    setMeta("next_refresh_at", String(Date.now() + PAGES_SCHEDULE_INTERVAL_MS));
   } else {
     getDb();
   }

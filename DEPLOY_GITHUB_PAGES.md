@@ -9,7 +9,7 @@
 - [`scripts/pages-fetch.ts`](./scripts/pages-fetch.ts)：在 GitHub Actions 中运行一轮 7 源并发抓取，更新 SQLite（保留近 7 天历史与「本轮新增」状态），导出完整前端状态至 `public/board.json`，并刷盘关闭 WAL。
 - [`scripts/pages-build.mjs`](./scripts/pages-build.mjs)：自动识别仓库子路径（`basePath`），在隔离临时目录执行 Next.js `output: "export"` 静态构建，产出带 `.nojekyll` 的纯静态站点 `./out`。
 - [`src/lib/board-client.ts`](./src/lib/board-client.ts) & [`src/components/deal-board.tsx`](./src/components/deal-board.tsx)：静态模式下改为直接拉取同源 `./board.json`，页面右上角「同步快照」按钮支持随时拉取最新已发布的快照。
-- [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)：每 2 小时定时运行（并支持手动一键触发），利用 `actions/cache` 跨轮次持久化 `deals.db`，抓取构建后自动发布到 GitHub Pages。
+- [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)：每小时定时运行（并支持手动一键触发），利用 `actions/cache` 跨轮次持久化 `deals.db`，抓取构建后自动发布到 GitHub Pages。
 
 ---
 
@@ -46,7 +46,7 @@ git push -u origin main
 1. **首次触发**：在第 3 步开启 `GitHub Actions` 作为 Pages 来源后，进入仓库顶部的 **Actions** 页面 → 左侧点击 **Fetch & Deploy GitHub Pages** → 右侧点击 **Run workflow** 手动触发第一次运行（约 1～2 分钟完成）。
 2. **打开看板**：运行变绿后，直接打开：
    `https://jlcbk.github.io/perkradar-pages/`
-3. **自动更新**：之后每隔 **2 小时** GitHub 会自动抓取最新消息并更新页面；收藏和已领记录保存在你当前浏览器的 `localStorage` 中，跨轮次刷新不会丢失。
+3. **自动更新**：之后每隔 **1 小时** GitHub 会自动抓取最新消息并更新页面；收藏和已领记录保存在你当前浏览器的 `localStorage` 中，跨轮次刷新不会丢失。
 4. **本地预览测试命令**（如需在本机测试构建）：
    ```bash
    # 离线生成空快照并验证静态打包
