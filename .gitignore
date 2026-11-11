@@ -68,3 +68,7 @@ rounds/*.json
 
 # local API secrets
 .secrets/
+
+# static GitHub Pages snapshot generated at build time
+/public/board.json
+/.pages-build/

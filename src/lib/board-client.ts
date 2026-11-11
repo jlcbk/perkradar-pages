@@ -11,7 +11,23 @@ export class AuthExpiredError extends Error {
   }
 }
 
+const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 export async function readBoard(signal: AbortSignal): Promise<BoardState> {
+  if (STATIC_EXPORT) {
+    const response = await fetch(`${BASE_PATH}/board.json?t=${Date.now()}`, { cache: "no-store", signal });
+    if (!response.ok) throw new Error("数据暂时不可用");
+    const page = normalizeBoardState(await response.json());
+    if (!page) throw new Error("看板数据格式异常");
+    return expireBoard(
+      {
+        ...page,
+        pagination: { offset: 0, limit: page.deals.length, total: page.deals.length, hasMore: false },
+      },
+      Date.now(),
+    );
+  }
   let board: BoardState | null = null;
   let offset = 0;
   // A page sequence must come from one refresh generation; retry next poll if it changes.

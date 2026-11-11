@@ -12,7 +12,10 @@
     "start": "node scripts/serve.mjs start",
     "lint": "eslint",
     "test": "node --import tsx --test tests/*.test.ts",
-    "report": "node --import tsx scripts/live-report.ts"
+    "report": "node --import tsx scripts/live-report.ts",
+    "pages:fetch": "node --import tsx scripts/pages-fetch.ts",
+    "pages:build": "node scripts/pages-build.mjs",
+    "pages": "npm run pages:fetch && npm run pages:build"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

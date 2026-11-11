@@ -27,6 +27,7 @@ import { CATEGORIES, type BoardState, type Category, type DealDTO, type SourceSt
 import "./deal-board.css";
 
 const emptyPersonal: Personal = { claimed: [], favorites: [] };
+const staticMode = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
 type Alert = { text: string; role: "status" | "alert"; testId: string };
 
 function readError(data: unknown): string | null {
@@ -126,10 +127,11 @@ export function DealBoard({ initial, authEnabled = false }: { initial: BoardStat
     };
     const onVisible = () => { if (document.visibilityState !== "hidden") void tick(); };
     void tick();
-    const timer = setInterval(() => { setBoard((previous) => expireBoard(previous, Date.now())); void tick(); }, 30_000);
+    const expireTimer = setInterval(() => { setBoard((previous) => expireBoard(previous, Date.now())); }, 30_000);
+    const pollTimer = setInterval(() => { void tick(); }, staticMode ? 5 * 60_000 : 30_000);
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
-    return () => { stopped = true; inFlight?.abort(); clearInterval(timer); window.removeEventListener("focus", onVisible); document.removeEventListener("visibilitychange", onVisible); };
+    return () => { stopped = true; inFlight?.abort(); clearInterval(expireTimer); clearInterval(pollTimer); window.removeEventListener("focus", onVisible); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   function savePersonal(next: Personal) {
@@ -163,6 +165,19 @@ export function DealBoard({ initial, authEnabled = false }: { initial: BoardStat
   async function refresh() {
     setRefreshing(true);
     setMessage(null);
+    if (staticMode) {
+      try {
+        const next = await readBoard(AbortSignal.timeout(15_000));
+        setBoard({ ...next, refreshInProgress: false });
+        setPollError(false);
+        setMessage("已重新加载页面最新快照（源站抓取由 GitHub Actions 定时运行）");
+      } catch {
+        setMessage("网络异常，暂时无法加载快照");
+      } finally {
+        setRefreshing(false);
+      }
+      return;
+    }
     try {
       const response = await fetch("/api/refresh", { method: "POST", cache: "no-store", signal: AbortSignal.timeout(35_000) });
       const data: unknown = await response.json().catch(() => null);
@@ -264,7 +279,7 @@ export function DealBoard({ initial, authEnabled = false }: { initial: BoardStat
           <Link className="demo-brand" href="/" data-testid="brand"><Radar aria-hidden="true" />PerkRadar</Link>
           <div className="demo-header-actions">
             <Button className="board-refresh" data-testid="refresh" onClick={refresh} disabled={busy} aria-busy={busy}>
-              <RefreshCw aria-hidden="true" />{busy ? "刷新中" : "立即刷新"}
+              <RefreshCw aria-hidden="true" />{busy ? "刷新中" : staticMode ? "同步快照" : "立即刷新"}
             </Button>
             {authEnabled ? (
               <Button variant="ghost" data-testid="sign-out" onClick={signOut}><LogOut aria-hidden="true" />退出</Button>

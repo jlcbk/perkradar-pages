@@ -1,0 +1,90 @@
+name: Fetch & Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # 每 2 小时抓取并重新发布一次静态看板（UTC 时间）
+    - cron: '15 */2 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore SQLite database from previous run
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/perkradar-data
+          key: perkradar-sqlite-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            perkradar-sqlite-
+
+      - name: Fetch 7 live sources & export board.json
+        env:
+          DATA_DIR: ${{ runner.temp }}/perkradar-data
+          DISABLE_SCHEDULER: '1'
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+        run: npm run pages:fetch
+
+      - name: Save updated SQLite database to cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/perkradar-data
+          key: perkradar-sqlite-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Detect GitHub Pages basePath
+        id: basepath
+        run: |
+          owner_lower="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          repo_lower="$(echo "${repo_name}" | tr '[:upper:]' '[:lower:]')"
+          if [ "${repo_lower}" = "${owner_lower}.github.io" ]; then
+            echo "base_path=" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_path=/${repo_name}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build static Next.js board
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.basepath.outputs.base_path }}
+        run: npm run pages:build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
