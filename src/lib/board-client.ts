@@ -13,6 +13,9 @@ export class AuthExpiredError extends Error {
 
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+// GitHub Actions free public cron queues commonly experience multi-hour delays; avoid false alarms under 8h.
+const STALE_WINDOW_MS = (STATIC_EXPORT ? 8 : 2.5) * 3_600_000;
+const SEVERE_WINDOW_MS = (STATIC_EXPORT ? 12 : 4) * 3_600_000;
 
 export async function readBoard(signal: AbortSignal): Promise<BoardState> {
   if (STATIC_EXPORT) {
@@ -56,5 +59,5 @@ export function expireBoard(board: BoardState, now: number): BoardState {
   const age = board.lastUpdatedAt == null ? null : Math.max(0, now - board.lastUpdatedAt);
   return { ...board, deals, activeCount: deals.length, newCount: deals.filter((deal) => deal.isNew).length,
     sources: board.sources.map((source) => ({ ...source, activeCount: deals.filter((deal) => deal.sourceId === source.id).length })),
-    freshness: { lastRoundAgeMs: age, stale: age != null && age > 2.5 * 3_600_000, severe: age != null && age > 4 * 3_600_000 } };
+    freshness: { lastRoundAgeMs: age, stale: age != null && age > STALE_WINDOW_MS, severe: age != null && age > SEVERE_WINDOW_MS } };
 }

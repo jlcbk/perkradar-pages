@@ -5,8 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # 每小时抓取并重新发布一次静态看板（UTC 时间，避开整点/刻钟拥堵高峰）
-    - cron: '23 * * * *'
+    # 每 20 分钟设置一个候选唤醒点以抵御 GitHub 免费队列丢包；距上次成功不满 50 分钟时脚本自动秒级跳过
+    - cron: '7,27,47 * * * *'
 
 permissions:
   contents: read
@@ -21,6 +21,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      should_deploy: ${{ steps.fetch.outputs.should_deploy }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,6 +45,7 @@ jobs:
             perkradar-sqlite-
 
       - name: Fetch 7 live sources & export board.json
+        id: fetch
         env:
           DATA_DIR: ${{ runner.temp }}/perkradar-data
           DISABLE_SCHEDULER: '1'
@@ -50,7 +53,7 @@ jobs:
         run: npm run pages:fetch
 
       - name: Save updated SQLite database to cache
-        if: always()
+        if: always() && steps.fetch.outputs.should_deploy != 'false'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/perkradar-data
@@ -58,6 +61,7 @@ jobs:
 
       - name: Detect GitHub Pages basePath
         id: basepath
+        if: steps.fetch.outputs.should_deploy == 'true'
         run: |
           owner_lower="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           repo_name="${GITHUB_REPOSITORY#*/}"
@@ -69,17 +73,20 @@ jobs:
           fi
 
       - name: Build static Next.js board
+        if: steps.fetch.outputs.should_deploy == 'true'
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.basepath.outputs.base_path }}
         run: npm run pages:build
 
       - name: Upload Pages artifact
+        if: steps.fetch.outputs.should_deploy == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
 
   deploy:
     needs: build
+    if: needs.build.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

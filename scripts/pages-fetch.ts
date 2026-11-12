@@ -1,13 +1,48 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getBoardState } from "../src/lib/board";
-import { getDb, setMeta, useDatabase as resetDatabase } from "../src/lib/db";
+import { getDb, latestFinishedRound, setMeta, useDatabase as resetDatabase } from "../src/lib/db";
 import { runRefresh } from "../src/lib/refresh";
 
 const PAGES_SCHEDULE_INTERVAL_MS = 60 * 60_000;
+const MIN_SCHEDULE_GAP_MS = 50 * 60_000;
+
+function writeGithubOutput(key: string, value: string): void {
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (outputPath) {
+    fs.appendFileSync(outputPath, `${key}=${value}\n`);
+  }
+}
 
 async function main(): Promise<void> {
   const skipLiveFetch = process.env.SKIP_LIVE_FETCH === "1";
+  const isScheduledRun = process.env.GITHUB_EVENT_NAME === "schedule";
+
+  if (!skipLiveFetch && isScheduledRun) {
+    getDb();
+    const lastRound = latestFinishedRound();
+    if (
+      lastRound &&
+      lastRound.status === "success" &&
+      lastRound.finishedAt != null &&
+      Date.now() - lastRound.finishedAt < MIN_SCHEDULE_GAP_MS
+    ) {
+      const existing = getBoardState();
+      resetDatabase(null);
+      if (existing.activeCount > 0) {
+        writeGithubOutput("should_deploy", "false");
+        console.log(
+          JSON.stringify({
+            skipped: true,
+            reason: "recent_success_within_50m",
+            lastUpdatedLabel: existing.lastUpdatedLabel,
+            activeCount: existing.activeCount,
+          }),
+        );
+        return;
+      }
+    }
+  }
 
   if (!skipLiveFetch) {
     await runRefresh({ trigger: "schedule" });
@@ -44,9 +79,13 @@ async function main(): Promise<void> {
   );
 
   if (!skipLiveFetch && board.roundStatus === "failed" && board.activeCount === 0) {
+    writeGithubOutput("should_deploy", "false");
     console.error("所有来源均失败且数据库无可用历史条目，停止本次发布。");
     process.exitCode = 1;
+    return;
   }
+
+  writeGithubOutput("should_deploy", "true");
 }
 
 void main().catch((error) => {
