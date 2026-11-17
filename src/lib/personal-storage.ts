@@ -1,8 +1,10 @@
 export type Personal = { claimed: string[]; favorites: string[] };
+export type ViewMode = "grid" | "list";
 export const STORAGE_KEY = "perkradar-personal-v1";
 export const LEGACY_STORAGE_KEY = "daily-deals-personal-v1";
 export const SHOW_ALL_KEY = "perkradar-show-all-v1";
 export const LEGACY_SHOW_ALL_KEY = "daily-deals-show-all-v1";
+export const VIEW_MODE_KEY = "perkradar-view-mode-v1";
 type Store = Pick<Storage, "getItem" | "setItem">;
 export function loadPersonal(store: Store, fallback: Personal = { claimed: [], favorites: [] }): Personal {
   try {
@@ -24,4 +26,9 @@ export function loadShowAll(store: Store): boolean {
     if (legacy !== null && current === null) { try { store.setItem(SHOW_ALL_KEY, legacy); } catch { /* keep old key */ } }
     return legacy === null ? true : legacy === "1";
   } catch { return true; }
+}
+export function loadViewMode(store: Store): ViewMode {
+  try {
+    return store.getItem(VIEW_MODE_KEY) === "list" ? "list" : "grid";
+  } catch { return "grid"; }
 }
