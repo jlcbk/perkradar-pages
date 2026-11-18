@@ -21,6 +21,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    continue-on-error: ${{ github.event_name == 'schedule' }}
     outputs:
       should_deploy: ${{ steps.fetch.outputs.should_deploy }}
     steps:
@@ -88,6 +89,7 @@ jobs:
     needs: build
     if: needs.build.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'schedule' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

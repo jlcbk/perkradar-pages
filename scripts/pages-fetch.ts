@@ -80,8 +80,8 @@ async function main(): Promise<void> {
 
   if (!skipLiveFetch && board.roundStatus === "failed" && board.activeCount === 0) {
     writeGithubOutput("should_deploy", "false");
-    console.error("所有来源均失败且数据库无可用历史条目，停止本次发布。");
-    process.exitCode = 1;
+    console.warn("所有来源均失败且数据库无可用历史条目，跳过本次发布并等待下一轮。");
+    if (!isScheduledRun) process.exitCode = 1;
     return;
   }
 
@@ -89,6 +89,9 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error) => {
+  writeGithubOutput("should_deploy", "false");
   console.error(error);
-  process.exitCode = 1;
+  if (process.env.GITHUB_EVENT_NAME !== "schedule") {
+    process.exitCode = 1;
+  }
 });
